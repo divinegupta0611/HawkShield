@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import '../style/AuthCSS.css';
-
+import { supabase } from "../SupabaseClient";
 const Signup = () => {
   const [formData, setFormData] = useState({
     fullName: '',
@@ -62,16 +62,51 @@ const Signup = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    
-    if (validateForm()) {
-      // Handle signup logic here
-      console.log('Signup successful:', formData);
-      alert('Account created successfully!');
-      // Redirect to login or dashboard
-    }
-  };
+  const handleSubmit = async (e) => {
+  e.preventDefault();
+
+  if (!validateForm()) return;
+
+  // Check if user already exists
+  const { data: existingUser } = await supabase
+    .from("HawkShieldAuth")
+    .select("*")
+    .eq("Email", formData.email)
+    .single();
+
+  if (existingUser) {
+    alert("User already exists. Please login.");
+    return;
+  }
+
+  // Insert new user
+  const { data, error } = await supabase
+    .from("HawkShieldAuth")
+    .insert([
+      {
+        Name: formData.fullName,
+        Email: formData.email,
+        Password: formData.password,
+      },
+    ]);
+
+  if (error) {
+    alert("Signup error: " + error.message);
+    return;
+  }
+
+  // Save user in localStorage
+  localStorage.setItem(
+    "hawkshield_user",
+    JSON.stringify({
+      name: formData.fullName,
+      email: formData.email,
+    })
+  );
+
+  alert("Account created successfully!");
+  window.location.href = "/dashboard";
+};
 
   return (
     <div className="auth-container">

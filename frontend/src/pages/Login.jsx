@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import '../style/AuthCSS.css';
-
+import { supabase } from "../SupabaseClient";
 const Login = () => {
   const [formData, setFormData] = useState({
     email: '',
@@ -45,17 +45,40 @@ const Login = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    
-    if (validateForm()) {
-      // Handle login logic here
-      console.log('Login successful:', formData);
-      console.log('Remember me:', rememberMe);
-      alert('Login successful!');
-      // Redirect to dashboard
-    }
-  };
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  if (!validateForm()) return;
+
+  // Check if user exists
+  const { data: user, error } = await supabase
+    .from("HawkShieldAuth")
+    .select("*")
+    .eq("Email", formData.email)
+    .single();
+
+  if (!user) {
+    alert("User not found. Please sign up.");
+    return;
+  }
+
+  // Verify password
+  if (user.Password !== formData.password) {
+    alert("Incorrect password.");
+    return;
+  }
+
+  // Store in localStorage
+  localStorage.setItem(
+    "hawkshield_user",
+    JSON.stringify({
+      name: user.Name,
+      email: user.Email,
+    })
+  );
+
+  alert("Login successful!");
+  window.location.href = "/dashboard";
+};
 
   return (
     <div className="auth-container">

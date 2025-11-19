@@ -40,7 +40,12 @@
 .nav-links a:hover {
   color: #93c5fd;
 }
-
+.logout-btn{
+  color: white;
+  text-decoration: none;
+  transition: color 0.3s;
+  font-weight: 500;
+}
 .user-circle {
   width: 45px;
   height: 45px;
