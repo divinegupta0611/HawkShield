@@ -283,3 +283,61 @@ body {
     flex-direction: column;
   }
 }
+/* Modal Background */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Modal Box */
+.modal-box {
+  width: 400px;
+  background: #1b1b1b;
+  padding: 20px;
+  border-radius: 12px;
+  color: white;
+  box-shadow: 0 0 20px #000;
+}
+
+.modal-box input {
+  width: 100%;
+  padding: 10px;
+  margin-top: 5px;
+  background: #222;
+  color: white;
+  border: 1px solid #333;
+  border-radius: 6px;
+}
+
+.modal-buttons {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 15px;
+}
+
+.save-btn {
+  background: #0f0;
+  color: black;
+  padding: 10px 20px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.cancel-btn {
+  background: #f00;
+  color: white;
+  padding: 10px 20px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-weight: bold;
+}

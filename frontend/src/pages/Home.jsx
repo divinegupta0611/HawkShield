@@ -1,8 +1,62 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import '../style/HomeCSS.css';
 import NavBar from '../components/NavBar.jsx';
 const Home = () => {
   const [user] = useState({ name: 'User' }); // Replace with actual user data
+  const [showCameraModal, setShowCameraModal] = useState(false);
+  const [cameraId, setCameraId] = useState("");
+  const [cameraName, setCameraName] = useState("");
+  const [stream, setStream] = useState(null);
+  const videoRef = useRef(null);
+  // Open modal & preview webcam
+  const openCameraModal = async () => {
+    setShowCameraModal(true);
+
+    try {
+      const userStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      setStream(userStream);
+      if (videoRef.current) {
+        videoRef.current.srcObject = userStream;
+      }
+    } catch (error) {
+      console.error("Camera access error:", error);
+      alert("Unable to access camera.");
+    }
+  };
+
+  // Save camera (ID + name)
+  const saveCamera = () => {
+    if (!cameraId || !cameraName) {
+      alert("Enter camera ID & name");
+      return;
+    }
+
+    const cameras = JSON.parse(localStorage.getItem("hawkshield_cameras") || "[]");
+
+    cameras.push({
+      id: cameraId,
+      name: cameraName,
+      type: "webcam",
+      createdAt: Date.now(),
+    });
+
+    localStorage.setItem("hawkshield_cameras", JSON.stringify(cameras));
+
+    alert("Camera added successfully!");
+
+    setShowCameraModal(false);
+    setCameraId("");
+    setCameraName("");
+
+    if (stream) {
+      stream.getTracks().forEach((t) => t.stop());
+    }
+  };
+
+  const closeModal = () => {
+    setShowCameraModal(false);
+    if (stream) stream.getTracks().forEach((t) => t.stop());
+  };
 
   return (
     <div className="home-container">
@@ -38,9 +92,46 @@ const Home = () => {
               <p>Get notified immediately when threats are detected</p>
             </div>
           </div>
-          <button className="secondary-button">Add Camera Now</button>
+          <button className="secondary-button" onClick={openCameraModal}>Add Camera Now</button>
         </div>
       </section>
+      {/* Camera Add Modal */}
+      {showCameraModal && (
+        <div className="modal-overlay">
+          <div className="modal-box">
+            <h2>Add New Camera</h2>
+
+            <label>Camera ID</label>
+            <input
+              type="text"
+              placeholder="cam01"
+              value={cameraId}
+              onChange={(e) => setCameraId(e.target.value)}
+            />
+
+            <label>Camera Name</label>
+            <input
+              type="text"
+              placeholder="Front Gate"
+              value={cameraName}
+              onChange={(e) => setCameraName(e.target.value)}
+            />
+
+            <video
+              ref={videoRef}
+              autoPlay
+              muted
+              playsInline
+              style={{ width: "100%", marginTop: "10px", borderRadius: "10px" }}
+            ></video>
+
+            <div className="modal-buttons">
+              <button onClick={saveCamera} className="save-btn">Save</button>
+              <button onClick={closeModal} className="cancel-btn">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Why We Section */}
       <section className="why-we-section" id="about">
