@@ -25,25 +25,31 @@ const Home = () => {
   };
 
   // Save camera (ID + name)
-  const saveCamera = () => {
-    if (!cameraId || !cameraName) {
-      alert("Enter camera ID & name");
-      return;
-    }
+  const saveCamera = async () => {
+  if (!cameraId || !cameraName) {
+    alert("Enter camera ID & name");
+    return;
+  }
 
-    const cameras = JSON.parse(localStorage.getItem("hawkshield_cameras") || "[]");
-
-    cameras.push({
-      id: cameraId,
-      name: cameraName,
-      type: "webcam",
-      createdAt: Date.now(),
+  try {
+    const response = await fetch("http://127.0.0.1:8000/api/cameras/add/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        cameraId,
+        cameraName,
+        people: 0,
+        threats: 0
+      }),
     });
 
-    localStorage.setItem("hawkshield_cameras", JSON.stringify(cameras));
+    if (!response.ok) {
+      throw new Error("Failed to add camera");
+    }
 
     alert("Camera added successfully!");
 
+    // Reset modal state
     setShowCameraModal(false);
     setCameraId("");
     setCameraName("");
@@ -51,9 +57,15 @@ const Home = () => {
     if (stream) {
       stream.getTracks().forEach((t) => t.stop());
     }
-  };
 
-  const closeModal = () => {
+  } catch (error) {
+    console.error(error);
+    alert("Error adding camera. Check backend connection.");
+  }
+};
+
+
+  const closeModal = () => {21
     setShowCameraModal(false);
     if (stream) stream.getTracks().forEach((t) => t.stop());
   };

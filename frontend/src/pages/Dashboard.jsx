@@ -1,72 +1,230 @@
 import React, { useEffect, useRef, useState } from "react";
 import NavBar from "../components/NavBar";
+
 export default function Dashboard() {
   const [cameras, setCameras] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const videoRefs = useRef({});
+  const streams = useRef({});
 
+  // Fetch cameras from backend API
   useEffect(() => {
-    const saved = JSON.parse(localStorage.getItem("hawkshield_cameras") || "[]");
-    setCameras(saved);
+    const fetchCameras = async () => {
+      try {
+        setLoading(true);
+        console.log("Fetching cameras from backend...");
+        
+        const response = await fetch("http://127.0.0.1:8000/api/cameras/");
+        console.log("Response status:", response.status);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log("Received cameras:", data);
+        
+        // Backend returns {cameras: [...]}
+        const camerasArray = data.cameras || [];
+        
+        setCameras(camerasArray);
+        setError(null);
+      } catch (error) {
+        console.error("Error fetching cameras:", error);
+        setError(error.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCameras();
+    
+    // Optional: Refresh cameras every 10 seconds
+    const interval = setInterval(fetchCameras, 10000);
+    return () => clearInterval(interval);
   }, []);
 
+  // Start webcam stream for each camera
   useEffect(() => {
     cameras.forEach(async (cam) => {
-      if (cam.type === "webcam") {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      const camId = cam.cameraId || cam.id;
+      
+      if (!streams.current[camId]) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+          streams.current[camId] = stream;
 
-        if (videoRefs.current[cam.id]) {
-          videoRefs.current[cam.id].srcObject = stream;
+          if (videoRefs.current[camId]) {
+            videoRefs.current[camId].srcObject = stream;
+          }
+        } catch (e) {
+          console.log("Camera access error:", e);
         }
       }
     });
+
+    // Cleanup function
+    return () => {
+      Object.values(streams.current).forEach(stream => {
+        stream.getTracks().forEach(track => track.stop());
+      });
+    };
   }, [cameras]);
+
+  // REMOVE CAMERA FUNCTION
+  const removeCamera = async (cameraId) => {
+    if (!window.confirm("Are you sure you want to delete this camera?")) return;
+
+    try {
+      const response = await fetch(`http://127.0.0.1:8000/api/cameras/delete/${cameraId}/`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        // Stop webcam stream
+        if (streams.current[cameraId]) {
+          streams.current[cameraId].getTracks().forEach((t) => t.stop());
+          delete streams.current[cameraId];
+        }
+
+        // Remove camera from list
+        setCameras(cameras.filter((cam) => (cam.cameraId || cam.id) !== cameraId));
+        alert("Camera removed successfully!");
+      } else {
+        throw new Error("Failed to remove camera");
+      }
+    } catch (error) {
+      console.error("Error removing camera:", error);
+      alert("Failed to remove camera. Check console for details.");
+    }
+  };
 
   return (
     <div style={{ padding: "30px" }}>
-        <NavBar/>
+      <NavBar />
       <h1>Camera Dashboard</h1>
       <p>Live view of all connected cameras</p>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(350px, 1fr))",
-          gap: "20px",
-          marginTop: "20px",
-        }}
-      >
-        {cameras.map((cam) => (
-          <div
-            key={cam.id}
+      {/* Loading State */}
+      {loading && <p>Loading cameras...</p>}
+
+      {/* Error State */}
+      {error && (
+        <div style={{ 
+          padding: "20px", 
+          background: "#ff3b3b22", 
+          border: "1px solid #ff3b3b",
+          borderRadius: "8px",
+          color: "#ff3b3b",
+          marginTop: "20px"
+        }}>
+          <strong>Error loading cameras:</strong> {error}
+          <br />
+          <small>Make sure your backend is running on http://127.0.0.1:8000</small>
+        </div>
+      )}
+
+      {/* Cameras Grid */}
+      {!loading && !error && cameras.length > 0 && (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(350px, 1fr))",
+            gap: "20px",
+            marginTop: "20px",
+          }}
+        >
+          {cameras.map((cam) => {
+            const camId = cam.cameraId || cam.id;
+            const camName = cam.cameraName || cam.name || "Unknown Camera";
+            
+            return (
+              <div
+                key={camId}
+                style={{
+                  padding: "20px",
+                  borderRadius: "12px",
+                  background: "#111",
+                  color: "white",
+                  border: "1px solid #333",
+                  position: "relative",
+                }}
+              >
+                <h3>
+                  {camName} ({camId})
+                </h3>
+
+                {/* Camera Stats */}
+                <div style={{ fontSize: "12px", color: "#999", marginTop: "5px" }}>
+                  {cam.people !== undefined && `People: ${cam.people} | `}
+                  {cam.threats !== undefined && `Threats: ${cam.threats}`}
+                </div>
+
+                <button
+                  onClick={() => removeCamera(camId)}
+                  style={{
+                    position: "absolute",
+                    top: "15px",
+                    right: "15px",
+                    background: "#ff3b3b",
+                    border: "none",
+                    padding: "6px 12px",
+                    borderRadius: "6px",
+                    cursor: "pointer",
+                    color: "white",
+                    fontWeight: "bold",
+                  }}
+                >
+                  Remove
+                </button>
+
+                <video
+                  ref={(el) => (videoRefs.current[camId] = el)}
+                  autoPlay
+                  playsInline
+                  muted
+                  style={{
+                    width: "100%",
+                    height: "240px",
+                    background: "black",
+                    borderRadius: "10px",
+                    marginTop: "10px",
+                  }}
+                ></video>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* No Cameras State */}
+      {!loading && !error && cameras.length === 0 && (
+        <div style={{ 
+          padding: "40px", 
+          textAlign: "center",
+          background: "#f5f5f5",
+          borderRadius: "12px",
+          marginTop: "20px"
+        }}>
+          <h3>No cameras added yet</h3>
+          <p>Add your first camera from the Home page!</p>
+          <a 
+            href="/" 
             style={{
-              padding: "20px",
-              borderRadius: "12px",
-              background: "#111",
+              display: "inline-block",
+              marginTop: "10px",
+              padding: "10px 20px",
+              background: "#007bff",
               color: "white",
-              border: "1px solid #333",
+              textDecoration: "none",
+              borderRadius: "6px"
             }}
           >
-            <h3>{cam.name} ({cam.id})</h3>
-
-            <video
-              ref={(el) => (videoRefs.current[cam.id] = el)}
-              autoPlay
-              playsInline
-              muted
-              style={{
-                width: "100%",
-                height: "240px",
-                background: "black",
-                borderRadius: "10px",
-                marginTop: "10px",
-              }}
-            ></video>
-          </div>
-        ))}
-      </div>
-
-      {cameras.length === 0 && <p>No cameras added yet.</p>}
+            Go to Home
+          </a>
+        </div>
+      )}
     </div>
   );
 }
-
