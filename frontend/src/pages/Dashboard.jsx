@@ -5,6 +5,9 @@ export default function Dashboard() {
   const [cameras, setCameras] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [safeLogs, setSafeLogs] = useState([]);
+  const [threatLogs, setThreatLogs] = useState([]);
+
   const videoRefs = useRef({});
   const streams = useRef({});
 
@@ -72,6 +75,68 @@ export default function Dashboard() {
     };
   }, [cameras]);
 
+  const captureFrame = (camId) => {
+  const video = videoRefs.current[camId];
+  if (!video) return null;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve(blob), "image/jpeg");
+  });
+};
+
+const sendForDetection = async (cam) => {
+  const camId = cam.cameraId;
+  const camName = cam.cameraName;
+
+  const frame = await captureFrame(camId);
+  if (!frame) return;
+
+  const formData = new FormData();
+  formData.append("image", frame, "frame.jpg");
+
+  try {
+    const res = await fetch("http://127.0.0.1:8000/api/detection/threats/", {
+      method: "POST",
+      body: formData
+    });
+
+    const data = await res.json();
+
+    const hasThreat =
+      data.knife.length > 0 ||
+      data.gun.length > 0 ||
+      data.mask?.length > 0 ||
+      data.emotion?.length > 0;
+
+    const logEntry = `[${camId} | ${camName}] ${hasThreat ? "Threat detected" : "Safe"}`;
+
+    if (hasThreat) {
+      setThreatLogs((prev) => [...prev.slice(-20), logEntry]);
+    } else {
+      setSafeLogs((prev) => [...prev.slice(-20), logEntry]);
+    }
+  } catch (err) {
+    console.log("Detection error:", err);
+  }
+};
+
+useEffect(() => {
+  const interval = setInterval(() => {
+    cameras.forEach((cam) => {
+      sendForDetection(cam);
+    });
+  }, 4000);
+
+  return () => clearInterval(interval);
+}, [cameras]);
+
   // REMOVE CAMERA FUNCTION
   const removeCamera = async (cameraId) => {
     if (!window.confirm("Are you sure you want to delete this camera?")) return;
@@ -124,6 +189,44 @@ export default function Dashboard() {
           <small>Make sure your backend is running on http://127.0.0.1:8000</small>
         </div>
       )}
+      <div style={{ display: "flex", gap: "20px", marginTop: "40px" }}>
+  
+  {/* SAFE LOGS */}
+  <div style={{
+    flex: 1,
+    background: "#d9d9d9ff",
+    padding: "20px",
+    borderRadius: "10px",
+    color: "#00ff00",
+    height: "300px",
+    overflowY: "auto",
+    border: "1px solid #064f06"
+  }}>
+    <h3>Safe Logs</h3>
+    {safeLogs.map((log, i) => (
+      <div key={i} style={{ marginBottom: "8px" }}>{log}</div>
+    ))}
+  </div>
+
+  {/* THREAT LOGS */}
+  <div style={{
+    flex: 1,
+    background: "#d9d9d9ff",
+    padding: "20px",
+    borderRadius: "10px",
+    color: "#ff4d4d",
+    height: "300px",
+    overflowY: "auto",
+    border: "1px solid #6b0a0a"
+  }}>
+    <h3>Threat Logs</h3>
+    {threatLogs.map((log, i) => (
+      <div key={i} style={{ marginBottom: "8px" }}>{log}</div>
+    ))}
+  </div>
+
+</div>
+
 
       {/* Cameras Grid */}
       {!loading && !error && cameras.length > 0 && (
@@ -225,6 +328,7 @@ export default function Dashboard() {
           </a>
         </div>
       )}
+
     </div>
   );
 }
