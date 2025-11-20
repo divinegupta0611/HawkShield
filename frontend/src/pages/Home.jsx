@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import '../style/HomeCSS.css';
 import NavBar from '../components/NavBar.jsx';
 const Home = () => {
+  const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
   const [user] = useState({ name: 'User' }); // Replace with actual user data
   const [showCameraModal, setShowCameraModal] = useState(false);
   const [cameraId, setCameraId] = useState("");
@@ -104,7 +105,11 @@ const Home = () => {
               <p>Get notified immediately when threats are detected</p>
             </div>
           </div>
-          <button className="secondary-button" onClick={openCameraModal}>Add Camera Now</button>
+                    {isLoggedIn && (
+            <button className="secondary-button" onClick={openCameraModal}>
+              Add Camera Now
+            </button>
+          )}
         </div>
       </section>
       {/* Camera Add Modal */}

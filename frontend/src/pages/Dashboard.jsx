@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import NavBar from "../components/NavBar";
+import '../style/DashboardCSS.css';
 
 export default function Dashboard() {
   const [cameras, setCameras] = useState([]);
@@ -76,66 +77,67 @@ export default function Dashboard() {
   }, [cameras]);
 
   const captureFrame = (camId) => {
-  const video = videoRefs.current[camId];
-  if (!video) return null;
+    const video = videoRefs.current[camId];
+    if (!video) return null;
 
-  const canvas = document.createElement("canvas");
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
 
-  const ctx = canvas.getContext("2d");
-  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-  return new Promise((resolve) => {
-    canvas.toBlob((blob) => resolve(blob), "image/jpeg");
-  });
-};
-
-const sendForDetection = async (cam) => {
-  const camId = cam.cameraId;
-  const camName = cam.cameraName;
-
-  const frame = await captureFrame(camId);
-  if (!frame) return;
-
-  const formData = new FormData();
-  formData.append("image", frame, "frame.jpg");
-
-  try {
-    const res = await fetch("http://127.0.0.1:8000/api/detection/threats/", {
-      method: "POST",
-      body: formData
+    return new Promise((resolve) => {
+      canvas.toBlob((blob) => resolve(blob), "image/jpeg");
     });
+  };
 
-    const data = await res.json();
+  const sendForDetection = async (cam) => {
+    const camId = cam.cameraId;
+    const camName = cam.cameraName;
 
-    const hasThreat =
-      data.knife.length > 0 ||
-      data.gun.length > 0 ||
-      data.mask?.length > 0 ||
-      data.emotion?.length > 0;
+    const frame = await captureFrame(camId);
+    if (!frame) return;
 
-    const logEntry = `[${camId} | ${camName}] ${hasThreat ? "Threat detected" : "Safe"}`;
+    const formData = new FormData();
+    formData.append("image", frame, "frame.jpg");
 
-    if (hasThreat) {
-      setThreatLogs((prev) => [...prev.slice(-20), logEntry]);
-    } else {
-      setSafeLogs((prev) => [...prev.slice(-20), logEntry]);
+    try {
+      const res = await fetch("http://127.0.0.1:8000/api/detection/threats/", {
+        method: "POST",
+        body: formData
+      });
+
+      const data = await res.json();
+
+      const hasThreat =
+        data.knife.length > 0 ||
+        data.gun.length > 0 ||
+        data.mask?.length > 0 ||
+        data.emotion?.length > 0;
+
+      const timestamp = new Date().toLocaleTimeString();
+      const logEntry = `[${timestamp}] ${camId} | ${camName} - ${hasThreat ? "⚠️ Threat detected" : "✓ Safe"}`;
+
+      if (hasThreat) {
+        setThreatLogs((prev) => [...prev.slice(-20), logEntry]);
+      } else {
+        setSafeLogs((prev) => [...prev.slice(-20), logEntry]);
+      }
+    } catch (err) {
+      console.log("Detection error:", err);
     }
-  } catch (err) {
-    console.log("Detection error:", err);
-  }
-};
+  };
 
-useEffect(() => {
-  const interval = setInterval(() => {
-    cameras.forEach((cam) => {
-      sendForDetection(cam);
-    });
-  }, 4000);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      cameras.forEach((cam) => {
+        sendForDetection(cam);
+      });
+    }, 4000);
 
-  return () => clearInterval(interval);
-}, [cameras]);
+    return () => clearInterval(interval);
+  }, [cameras]);
 
   // REMOVE CAMERA FUNCTION
   const removeCamera = async (cameraId) => {
@@ -166,134 +168,96 @@ useEffect(() => {
   };
 
   return (
-    <div style={{ padding: "30px" }}>
+    <div className="dashboard-container">
       <NavBar />
-      <h1>Camera Dashboard</h1>
-      <p>Live view of all connected cameras</p>
 
       {/* Loading State */}
-      {loading && <p>Loading cameras...</p>}
+      {loading && (
+        <div className="loading-state">
+          <p>
+            <span className="loading-spinner"></span>
+            Loading cameras...
+          </p>
+        </div>
+      )}
 
       {/* Error State */}
       {error && (
-        <div style={{ 
-          padding: "20px", 
-          background: "#ff3b3b22", 
-          border: "1px solid #ff3b3b",
-          borderRadius: "8px",
-          color: "#ff3b3b",
-          marginTop: "20px"
-        }}>
-          <strong>Error loading cameras:</strong> {error}
-          <br />
+        <div className="error-state">
+          <strong>⚠️ Error loading cameras:</strong> {error}
           <small>Make sure your backend is running on http://127.0.0.1:8000</small>
         </div>
       )}
-      <div style={{ display: "flex", gap: "20px", marginTop: "40px" }}>
-  
-  {/* SAFE LOGS */}
-  <div style={{
-    flex: 1,
-    background: "#d9d9d9ff",
-    padding: "20px",
-    borderRadius: "10px",
-    color: "#00ff00",
-    height: "300px",
-    overflowY: "auto",
-    border: "1px solid #064f06"
-  }}>
-    <h3>Safe Logs</h3>
-    {safeLogs.map((log, i) => (
-      <div key={i} style={{ marginBottom: "8px" }}>{log}</div>
-    ))}
-  </div>
 
-  {/* THREAT LOGS */}
-  <div style={{
-    flex: 1,
-    background: "#d9d9d9ff",
-    padding: "20px",
-    borderRadius: "10px",
-    color: "#ff4d4d",
-    height: "300px",
-    overflowY: "auto",
-    border: "1px solid #6b0a0a"
-  }}>
-    <h3>Threat Logs</h3>
-    {threatLogs.map((log, i) => (
-      <div key={i} style={{ marginBottom: "8px" }}>{log}</div>
-    ))}
-  </div>
+      {/* Logs Section */}
+      {!loading && !error && cameras.length > 0 && (
+        <div className="logs-container">
+          {/* SAFE LOGS */}
+          <div className="log-box safe">
+            <h3>✓ Safe Logs</h3>
+            {safeLogs.length === 0 ? (
+              <p style={{ color: '#16a34a', textAlign: 'center', marginTop: '2rem', opacity: 0.6 }}>
+                No safe logs yet...
+              </p>
+            ) : (
+              safeLogs.map((log, i) => (
+                <div key={i} className="log-entry">{log}</div>
+              ))
+            )}
+          </div>
 
-</div>
-
+          {/* THREAT LOGS */}
+          <div className="log-box threat">
+            <h3>⚠️ Threat Logs</h3>
+            {threatLogs.length === 0 ? (
+              <p style={{ color: '#dc2626', textAlign: 'center', marginTop: '2rem', opacity: 0.6 }}>
+                No threats detected...
+              </p>
+            ) : (
+              threatLogs.map((log, i) => (
+                <div key={i} className="log-entry">{log}</div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Cameras Grid */}
       {!loading && !error && cameras.length > 0 && (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(350px, 1fr))",
-            gap: "20px",
-            marginTop: "20px",
-          }}
-        >
+        <div className="cameras-grid">
           {cameras.map((cam) => {
             const camId = cam.cameraId || cam.id;
             const camName = cam.cameraName || cam.name || "Unknown Camera";
             
             return (
-              <div
-                key={camId}
-                style={{
-                  padding: "20px",
-                  borderRadius: "12px",
-                  background: "#111",
-                  color: "white",
-                  border: "1px solid #333",
-                  position: "relative",
-                }}
-              >
-                <h3>
-                  {camName} ({camId})
-                </h3>
-
-                {/* Camera Stats */}
-                <div style={{ fontSize: "12px", color: "#999", marginTop: "5px" }}>
-                  {cam.people !== undefined && `People: ${cam.people} | `}
-                  {cam.threats !== undefined && `Threats: ${cam.threats}`}
+              <div key={camId} className="camera-card">
+                <div className="camera-header">
+                  <div className="camera-title">
+                    <h3>{camName}</h3>
+                    <div className="camera-stats">
+                      <span className="stat-badge">ID: {camId}</span>
+                      {cam.people !== undefined && (
+                        <span className="stat-badge">👥 {cam.people}</span>
+                      )}
+                      {cam.threats !== undefined && (
+                        <span className="stat-badge">⚠️ {cam.threats}</span>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => removeCamera(camId)}
+                    className="remove-button"
+                  >
+                    Remove
+                  </button>
                 </div>
-
-                <button
-                  onClick={() => removeCamera(camId)}
-                  style={{
-                    position: "absolute",
-                    top: "15px",
-                    right: "15px",
-                    background: "#ff3b3b",
-                    border: "none",
-                    padding: "6px 12px",
-                    borderRadius: "6px",
-                    cursor: "pointer",
-                    color: "white",
-                    fontWeight: "bold",
-                  }}
-                >
-                  Remove
-                </button>
 
                 <video
                   ref={(el) => (videoRefs.current[camId] = el)}
                   autoPlay
                   playsInline
                   muted
-                  style={{
-                    width: "100%",
-                    height: "240px",
-                    background: "black",
-                    borderRadius: "10px",
-                    marginTop: "10px",
-                  }}
+                  className="camera-video"
                 ></video>
               </div>
             );
@@ -303,32 +267,15 @@ useEffect(() => {
 
       {/* No Cameras State */}
       {!loading && !error && cameras.length === 0 && (
-        <div style={{ 
-          padding: "40px", 
-          textAlign: "center",
-          background: "#f5f5f5",
-          borderRadius: "12px",
-          marginTop: "20px"
-        }}>
+        <div className="no-cameras-state">
+          <div className="no-cameras-icon">📹</div>
           <h3>No cameras added yet</h3>
-          <p>Add your first camera from the Home page!</p>
-          <a 
-            href="/" 
-            style={{
-              display: "inline-block",
-              marginTop: "10px",
-              padding: "10px 20px",
-              background: "#007bff",
-              color: "white",
-              textDecoration: "none",
-              borderRadius: "6px"
-            }}
-          >
+          <p>Add your first camera from the Home page to start monitoring!</p>
+          <a href="/" className="home-link">
             Go to Home
           </a>
         </div>
       )}
-
     </div>
   );
 }

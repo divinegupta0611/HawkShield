@@ -103,7 +103,8 @@ const Signup = () => {
       email: formData.email,
     })
   );
-
+  // Mark user as logged in
+localStorage.setItem("isLoggedIn", "true");
   alert("Account created successfully!");
   window.location.href = "/dashboard";
 };
